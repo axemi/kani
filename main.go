@@ -11,23 +11,27 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+var currentConfig *config
+
 func main() {
 	config, err := parseConfig("config.json") //store settings in config.json
 	if err != nil {
 		log.Panicf("error parsing config, %v", err)
 	}
-	dg, err := discordgo.New("Bot " + config.Token)
+	currentConfig = config
+	dg, err := discordgo.New("Bot " + currentConfig.Token)
 	if err != nil {
 		log.Panicf("error creating new discord session, %v", err)
 	}
 	dg.AddHandler(onReady)
-	// err = dg.Open()
-	// if err != nil {
-	// 	log.Panicf("error opening discord session, %v", err)
-	// }
+	err = dg.Open()
+	if err != nil {
+		log.Panicf("error opening discord session, %v", err)
+	}
 
 	webserver := webserver(":8080")
 	go func() {
+		log.Printf("web server listening at %v", webserver.Addr)
 		log.Fatal(webserver.ListenAndServe())
 	}()
 	sc := make(chan os.Signal, 1)

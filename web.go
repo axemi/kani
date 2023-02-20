@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -23,7 +24,6 @@ func webserver(addr string) *http.Server {
 }
 
 func webHandler(w http.ResponseWriter, r *http.Request) {
-	// fmt.Fprint(w, "hello world")
 	index := &Page{Description: "testing"}
 	render(w, "index", index)
 }
@@ -31,18 +31,29 @@ func settingsHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method)
 	switch r.Method {
 	case "GET":
-		render(w, "settings", nil)
+		err := templates.ExecuteTemplate(w, "settings.html", currentConfig) //cannot use render() since currentConfig is not type Page
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		// render(w, "settings", nil)
 	case "POST":
-		bytes, err := io.ReadAll(r.Body)
+		bodyBytes, err := io.ReadAll(r.Body) //parse request Body
 		if err != nil {
 			log.Println(err)
 		}
-		fmt.Println(string(bytes))
-		configFile, err := os.OpenFile("config.json", os.O_CREATE|os.O_TRUNC, 0600)
+		var out bytes.Buffer
+		err = json.Indent(&out, bodyBytes, "", "\t") //format bytes to json(with indents) and send to out
 		if err != nil {
 			log.Println(err)
 		}
-		configFile.WriteString(string(bytes))
+		configFile, err := os.OpenFile("config.json", os.O_CREATE|os.O_TRUNC, 0600) //open config.json with rw access
+		if err != nil {
+			log.Println(err)
+		}
+		_, err = out.WriteTo(configFile) //replace all contents of config.json
+		if err != nil {
+			log.Println(err)
+		}
 		err = configFile.Close()
 		if err != nil {
 			log.Println(err)
