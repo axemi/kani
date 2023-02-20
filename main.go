@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"os"
@@ -24,11 +25,23 @@ func main() {
 	if err != nil {
 		log.Panicf("error opening discord session, %v", err)
 	}
+
+	webserver := webserver(":8080")
+	go func() {
+		log.Fatal(webserver.ListenAndServe())
+	}()
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
-	dg.Close()
+	err = dg.Close()
+	if err != nil {
+		log.Printf("discord session closed with error: %v", err)
+	}
 	log.Println("disconnected")
+	err = webserver.Shutdown(context.Background())
+	if err != nil {
+		log.Printf("web server shutdown with error: %v", err)
+	}
 }
 
 func onReady(session *discordgo.Session, event *discordgo.Ready) {
