@@ -21,10 +21,10 @@ func main() {
 		log.Panicf("error creating new discord session, %v", err)
 	}
 	dg.AddHandler(onReady)
-	err = dg.Open()
-	if err != nil {
-		log.Panicf("error opening discord session, %v", err)
-	}
+	// err = dg.Open()
+	// if err != nil {
+	// 	log.Panicf("error opening discord session, %v", err)
+	// }
 
 	webserver := webserver(":8080")
 	go func() {

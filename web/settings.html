@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings</title>
+</head>
+<body>
+    <form id="settings-form">
+        <fieldset>
+            <label for="bot-token">Bot Token</label>
+            <input type="text" id="bot-token" name="bot-token"/>
+            <input type="submit" id="settings-save-btn"value="Save"/>
+        </fieldset>
+    </form>
+    <script>
+        let settingsForm = document.getElementById("settings-form")
+        settingsForm.addEventListener("submit", async event => {
+            event.preventDefault()
+            let req = await fetch("/settings", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({token: event.target[1].value})
+            })
+        })
+    </script>
+</body>
+</html>
