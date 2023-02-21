@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"os/signal"
@@ -11,29 +12,29 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-var currentConfig *config
-
 func main() {
-	config, err := parseConfig("config.json") //store settings in config.json
+	config, err := loadConfig()
 	if err != nil {
-		log.Panicf("error parsing config, %v", err)
+		log.Panicf("error loading config, %v", err)
 	}
-	currentConfig = config
-	dg, err := discordgo.New("Bot " + currentConfig.Token)
+	dg, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		log.Panicf("error creating new discord session, %v", err)
 	}
 	dg.AddHandler(onReady)
-	err = dg.Open()
-	if err != nil {
-		log.Panicf("error opening discord session, %v", err)
-	}
-
-	webserver := webserver(":8080")
+	webserver := NewWebServer(":8080")
+	webserver.mux.HandleFunc("/", webHandler)
+	webserver.mux.Handle("/settings", settingsHandler(config))
 	go func() {
-		log.Printf("web server listening at %v", webserver.Addr)
-		log.Fatal(webserver.ListenAndServe())
+		log.Printf("web server listening at %v", webserver.server.Addr)
+		log.Fatal(webserver.server.ListenAndServe())
 	}()
+	if config.Token != "" {
+		err = dg.Open()
+		if err != nil {
+			log.Panicf("error opening discord session, %v", err)
+		}
+	}
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
@@ -42,7 +43,7 @@ func main() {
 		log.Printf("discord session closed with error: %v", err)
 	}
 	log.Println("disconnected")
-	err = webserver.Shutdown(context.Background())
+	err = webserver.server.Shutdown(context.Background())
 	if err != nil {
 		log.Printf("web server shutdown with error: %v", err)
 	}
@@ -56,15 +57,43 @@ type config struct {
 	Token string `json:"token"`
 }
 
-func parseConfig(filename string) (*config, error) {
-	configFile, err := os.ReadFile(filename)
+// will handle initial creating config.json and setting global currentConfig
+func loadConfig() (*config, error) {
+	var c *config
+	log.Println("checking for config.json")
+	_, err := os.Stat("config.json")
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	//handle config.json file not created
+	if errors.Is(err, os.ErrNotExist) {
+		log.Println("did not find config.json")
+		newConfigFile, err := os.Create("config.json")
+		if err != nil {
+			return nil, err
+		}
+		c = &config{Token: ""}
+		b, err := json.MarshalIndent(c, "", "\t")
+		if err != nil {
+			return nil, err
+		}
+		_, err = newConfigFile.Write(b)
+		if err != nil {
+			return nil, err
+		}
+		log.Println("created config.json")
+		return c, nil
+	}
+	//handle existing config.json
+	log.Println("reading config.json")
+	configFile, err := os.ReadFile("config.json")
 	if err != nil {
 		return nil, err
 	}
-	config := &config{}
-	err = json.Unmarshal(configFile, config)
+	log.Println("loading current config")
+	err = json.Unmarshal(configFile, &c)
 	if err != nil {
 		return nil, err
 	}
-	return config, nil
+	return c, nil
 }
