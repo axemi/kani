@@ -54,7 +54,8 @@ func onReady(session *discordgo.Session, event *discordgo.Ready) {
 }
 
 type config struct {
-	Token string `json:"token"`
+	Token         string `json:"token"`
+	DefaultPrefix string `json:"default_prefix"`
 }
 
 // will handle initial creating config.json and setting global currentConfig
@@ -97,3 +98,9 @@ func loadConfig() (*config, error) {
 	}
 	return c, nil
 }
+
+/*
+webserver chan - should send bot token, default prefix
+discord chan - wants to receive bot token, default prefix
+
+*/

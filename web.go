@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"log"
@@ -23,7 +22,6 @@ type WebServer struct {
 
 func NewWebServer(addr string) *WebServer {
 	mux := http.NewServeMux()
-	// mux.HandleFunc("/settings", settingsHandler)
 	server := &http.Server{Addr: addr, Handler: mux}
 	return &WebServer{server, mux}
 }
@@ -33,13 +31,12 @@ func webHandler(w http.ResponseWriter, r *http.Request) {
 	render(w, "index", index)
 }
 
-func settingsHandler(config *config) http.Handler {
-	log.Println(config.Token)
+func settingsHandler(c *config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println(r.Method)
 		switch r.Method {
 		case "GET":
-			err := templates.ExecuteTemplate(w, "settings.html", config) //cannot use render() since currentConfig is not type Page
+			err := templates.ExecuteTemplate(w, "settings.html", c) //cannot use render() since currentConfig is not type Page
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
@@ -49,8 +46,12 @@ func settingsHandler(config *config) http.Handler {
 			if err != nil {
 				log.Println(err)
 			}
-			var out bytes.Buffer
-			err = json.Indent(&out, bodyBytes, "", "\t") //format bytes to json(with indents) and send to out
+			newConfig := &config{}
+			err = json.Unmarshal(bodyBytes, newConfig) //unmarshal into newConfig so we only take data we want
+			if err != nil {
+				log.Println(err)
+			}
+			ncBytes, err := json.MarshalIndent(newConfig, "", "\t")
 			if err != nil {
 				log.Println(err)
 			}
@@ -58,11 +59,7 @@ func settingsHandler(config *config) http.Handler {
 			if err != nil {
 				log.Println(err)
 			}
-			_, err = out.WriteTo(configFile) //replace all contents of config.json
-			if err != nil {
-				log.Println(err)
-			}
-			err = configFile.Close()
+			_, err = configFile.Write(ncBytes) //write new config to file
 			if err != nil {
 				log.Println(err)
 			}
